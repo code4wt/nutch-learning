@@ -184,8 +184,7 @@ public class Generator extends NutchTool implements Tool {
                         return;
                 } catch (URLFilterException e) {
                     if (LOG.isWarnEnabled()) {
-                        LOG.warn("Couldn't filter url: " + url + " (" + e.getMessage()
-                                + ")");
+                        LOG.warn("Couldn't filter url: " + url + " (" + e.getMessage() + ")");
                     }
                 }
             }

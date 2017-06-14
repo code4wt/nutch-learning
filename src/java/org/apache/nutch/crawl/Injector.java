@@ -183,6 +183,15 @@ public class Injector extends NutchTool implements Tool {
             }
         }
 
+        /**
+         * map可以处理两种数据，一种是seed url文本，另一种是crawldb/current文件夹中的数据(key=url, value=CrawlDatum)。
+         * 之所以处理第二种，原因是可以需要将current所有数据重新进行inject操作，进行新一轮的抓取
+         * @param key
+         * @param value
+         * @param context
+         * @throws IOException
+         * @throws InterruptedException
+         */
         public void map(Text key, Writable value, Context context)
                 throws IOException, InterruptedException {
             if (value instanceof Text) {
@@ -258,6 +267,9 @@ public class Injector extends NutchTool implements Tool {
         }
 
         /**
+         * reduce方法根据下面规则和合并输入的url对于的CrawlDatum，如果overwrite或者update为true，则可手动调整
+         * 某个url的CrawlDatum。
+         *
          * Merge the input records as per rules below :
          *
          * <pre>
@@ -370,15 +382,21 @@ public class Injector extends NutchTool implements Tool {
         job.setSpeculativeExecution(false);
 
         // set input and output paths of the job
+        // 设置两种类型的输入数据，输出位置为 tempCrawlDb = crawldb-随机数
         MultipleInputs.addInputPath(job, current, SequenceFileInputFormat.class);
         MultipleInputs.addInputPath(job, urlDir, KeyValueTextInputFormat.class);
         FileOutputFormat.setOutputPath(job, tempCrawlDb);
 
         try {
             // run the job
+            // reduce过程结束后，hadoop框架调用CrawlDatum的write（CrawlDatum实现了Writable接口write方法）方法将数据输出到文件中
             job.waitForCompletion(true);
 
             // save output and perform cleanup
+            /* 1. 先清理 old 文件夹，之后将 crawlDb/current 替换名为crawlDb/old
+             * 2. 将 tempCrawlDb 替换为 crawlDb/current，并清理 tempCrawlDb 文件夹
+             * 3. 删除锁文件
+             */
             CrawlDb.install(job, crawlDb);
 
             if (LOG.isInfoEnabled()) {
