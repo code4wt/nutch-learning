@@ -172,6 +172,14 @@ public class Generator extends NutchTool implements Tool {
         }
 
         /** Select & invert subset due for fetch. */
+        /**
+         * map 主要用途是找出符合条件的链接，比如根据时间调度，找出符合 lasterFetchTime + interval <= curTime 条件
+         * @param key
+         * @param value
+         * @param output
+         * @param reporter
+         * @throws IOException
+         */
         public void map(Text key, CrawlDatum value,
                         OutputCollector<FloatWritable, SelectorEntry> output, Reporter reporter)
                 throws IOException {
@@ -191,12 +199,14 @@ public class Generator extends NutchTool implements Tool {
             CrawlDatum crawlDatum = value;
 
             // check fetch schedule
+            // 根据上次的抓取时间，判断本次是否应该抓取
             if (!schedule.shouldFetch(url, crawlDatum, curTime)) {
                 LOG.debug("-shouldFetch rejected '" + url + "', fetchTime="
                         + crawlDatum.getFetchTime() + ", curTime=" + curTime);
                 return;
             }
 
+            // 考虑部分数据没有抓取时间，只有生成时间。这里设定genDelay判定是否需要抓取
             LongWritable oldGenTime = (LongWritable) crawlDatum.getMetaData().get(
                     Nutch.WRITABLE_GENERATE_TIME_KEY);
             if (oldGenTime != null) { // awaiting fetch & update
@@ -226,11 +236,13 @@ public class Generator extends NutchTool implements Tool {
                 return;
 
             // consider only entries with a score superior to the threshold
+            // 链接得分低于阈值，不抓取
             if (scoreThreshold != Float.NaN && sort < scoreThreshold)
                 return;
 
             // consider only entries with a retry (or fetch) interval lower than
             // threshold
+            // 如果抓取间隔阈值不等于-1，且链接抓取间隔小于等于间隔阈值（在阈值范围内），则抓取，否则，不抓取。
             if (intervalThreshold != -1
                     && crawlDatum.getFetchInterval() > intervalThreshold)
                 return;
@@ -252,6 +264,14 @@ public class Generator extends NutchTool implements Tool {
         }
 
         /** Collect until limit is reached. */
+        /**
+         * reduce函数的核心功能就是计算该url属于哪一个segment中，不同时间获取到的不同url地址会存入crawl/segments下不同的文件夹中。
+         * @param key
+         * @param values
+         * @param output
+         * @param reporter
+         * @throws IOException
+         */
         public void reduce(FloatWritable key, Iterator<SelectorEntry> values,
                            OutputCollector<FloatWritable, SelectorEntry> output, Reporter reporter)
                 throws IOException {
@@ -295,6 +315,7 @@ public class Generator extends NutchTool implements Tool {
                 hostordomain = hostordomain.toLowerCase();
 
                 // only filter if we are counting hosts or domains
+                // 如果maxCount设定正值，则生成某个hostordomain下的url数量要小于maxCount
                 if (maxCount > 0) {
                     int[] hostCount = hostCounts.get(hostordomain);
                     if (hostCount == null) {
@@ -388,6 +409,8 @@ public class Generator extends NutchTool implements Tool {
             // if using HashComparator, we get only one input key in case of
             // hash collision
             // so use only URLs from values
+            // 使用 HashComparator 对URL进行hash运算时，不同的URL可能会存在冲突的可能，所以不应该使用Text key作为URL。
+            // hash(url1) == hash(url2), but url1 != url2.
             while (values.hasNext()) {
                 SelectorEntry entry = values.next();
                 output.collect(entry.url, entry.datum);
