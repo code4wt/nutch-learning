@@ -265,7 +265,9 @@ public class Generator extends NutchTool implements Tool {
 
         /** Collect until limit is reached. */
         /**
-         * reduce函数的核心功能就是计算该url属于哪一个segment中，不同时间获取到的不同url地址会存入crawl/segments下不同的文件夹中。
+         * reduce函数的核心功能就是计算该url属于哪一个segment中，分为两种情况：
+         * <br/>1. maxCount > 0，某一segment中的某host或domain下的url数量不得超过maxCount，超过则放在下一个segment
+         * <br/>2. maxCount <= 0, 次情况下，url按segment顺序存放，放满一个segment，剩下的url放入下一个segment中
          * @param key
          * @param values
          * @param output
