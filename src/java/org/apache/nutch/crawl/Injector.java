@@ -57,6 +57,10 @@ import java.util.Map;
 import java.util.Random;
 
 /**
+ *
+ * Injector 类处理含有 url 的文本文件，抽取 文本文件中的 url 及其属性， 并为这些 url 生成
+ * CrawlDatum 对象。最后将 &lt;url, CrawlDatum&gt; 键值对合并到 CrawlDb 数据库中。
+ *
  * Injector takes a flat file of URLs and merges ("injects") these URLs into the
  * CrawlDb. Useful for bootstrapping a Nutch crawl. The URL files contain one
  * URL per line, optionally followed by custom metadata separated by tabs with
@@ -202,6 +206,7 @@ public class Injector extends NutchTool implements Tool {
                 if (url.length() == 0 || url.startsWith("#"))
                     return;
 
+                String oldUrl = url;
                 url = filterNormalize(url);
                 if (url == null) {
                     context.getCounter("injector", "urls_filtered").increment(1);
@@ -234,6 +239,7 @@ public class Injector extends NutchTool implements Tool {
                 CrawlDatum datum = (CrawlDatum) value;
 
                 // remove 404 urls
+                // 如果 url404Purging 属性为 true，那么抓取状态为 STATUS_DB_GONE 的 url 将会被忽略，不会被传送到 reduce 程序中。
                 if (url404Purging && CrawlDatum.STATUS_DB_GONE == datum.getStatus())
                     return;
 
@@ -267,10 +273,13 @@ public class Injector extends NutchTool implements Tool {
         }
 
         /**
-         * reduce方法根据下面规则和合并输入的url对于的CrawlDatum，如果overwrite或者update为true，则可手动调整
-         * 某个url的CrawlDatum。
          *
-         * Merge the input records as per rules below :
+         * reduce 方法根据下面规则和合并输入的 url 对于的 CrawlDatum，如果 overwrite 或者 update 为 true，则可手动调整
+         * 某个 url 的 CrawlDatum。overwrite 和 update 操作的区别在于，不管旧的 url 的 CrawlDatum 里面的内容是什么样的，
+         * overwrite 操作一律用新的 CrawlDatum 对象覆盖之。而 update 操作则不同，update 操作只会修改旧 url CrawlDatum
+         * 对象中的 metaData、score、fetchInterval 三个属性，其他属性不修改。比如 url 的抓取状态还会保持原样
+         *
+         * <br><br>Merge the input records as per rules below :
          *
          * <pre>
          * 1. If there is ONLY new injected record ==> emit injected record
@@ -459,7 +468,7 @@ public class Injector extends NutchTool implements Tool {
     }
 
     public static void main(String[] args) throws Exception {
-        args = new String[]{"/Users/imtian/Temp/nutch/crawl/crawldb", "/Users/imtian/Temp/nutch/urls"};
+        args = new String[]{"/Users/imtian/Temp/nutch/crawl/", "/Users/imtian/Temp/nutch/urls"};
         int res = ToolRunner.run(NutchConfiguration.create(), new Injector(), args);
         System.exit(res);
     }
