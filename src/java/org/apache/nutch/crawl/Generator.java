@@ -206,7 +206,8 @@ public class Generator extends NutchTool implements Tool {
                 return;
             }
 
-            // 考虑部分数据没有抓取时间，只有生成时间。这里设定genDelay判定是否需要抓取
+            // 在有大量抓取任务的情况下，上一次 generate 阶段生成的 url 可能还没抓取完。对于这部分还未抓取的 url，
+            // 本轮 generate 显然不能将上一轮的记录覆盖掉，所以这里要判断一下生成时间是否过期，未过期的话本轮不生成。
             LongWritable oldGenTime = (LongWritable) crawlDatum.getMetaData().get(
                     Nutch.WRITABLE_GENERATE_TIME_KEY);
             if (oldGenTime != null) { // awaiting fetch & update
@@ -236,7 +237,7 @@ public class Generator extends NutchTool implements Tool {
                 return;
 
             // consider only entries with a score superior to the threshold
-            // 链接得分低于阈值，不抓取
+            // 链接得分低于阈值，不抓取。
             if (scoreThreshold != Float.NaN && sort < scoreThreshold)
                 return;
 
@@ -268,6 +269,8 @@ public class Generator extends NutchTool implements Tool {
          * reduce函数的核心功能就是计算该url属于哪一个segment中，分为两种情况：
          * <br/>1. maxCount > 0，某一segment中的某host或domain下的url数量不得超过maxCount，超过则放在下一个segment
          * <br/>2. maxCount <= 0, 次情况下，url按segment顺序存放，放满一个segment，剩下的url放入下一个segment中
+         * Generator 之所以要分片的原因是：将同一 host/domain 下的 url，尽量分布到不同的 segment 中。防止 fetcher 顺序
+         * 访问 fetchlist 时，部分 host/domain 下的 url 长时间得不到访问。
          * @param key
          * @param values
          * @param output
@@ -321,6 +324,8 @@ public class Generator extends NutchTool implements Tool {
                 if (maxCount > 0) {
                     int[] hostCount = hostCounts.get(hostordomain);
                     if (hostCount == null) {
+                        // hostCount[0] 表示某 host 下的url应该存储的段的编号
+                        // hostCount[1] 表示，在某一段下，当前 host 下的 url 数量
                         hostCount = new int[]{1, 0};
                         hostCounts.put(hostordomain, hostCount);
                     }
@@ -337,11 +342,14 @@ public class Generator extends NutchTool implements Tool {
 
                     // reached the limit of allowed URLs per host / domain
                     // see if we can put it in the next segment?
+                    // 如果某个 host/domain 下的 url 数量超过 maxCount，则将收下的 url 放入下一段中
+                    // 如果没有剩余的段可放某个 host 下的剩余url，剩余的 url 将会被抛弃。这些段中可能还有剩余的空间用于放置 url，
+                    // 只不过，某个 host 下的 url 数量，在所有段中都达到了 maxCount，再有新的 url 过来，就会被遗弃
                     if (hostCount[1] >= maxCount) {
                         if (hostCount[0] < maxNumSegments) {
                             hostCount[0]++;
                             hostCount[1] = 0;
-                        } else {
+                        } else {    // 如果没有剩余的段可放某个 host 下的剩余url，剩余的 url 将会被抛弃
                             if (hostCount[1] == maxCount + 1 && LOG.isInfoEnabled()) {
                                 LOG.info("Host or domain "
                                         + hostordomain
