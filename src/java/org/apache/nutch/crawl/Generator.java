@@ -257,7 +257,12 @@ public class Generator extends NutchTool implements Tool {
             output.collect(sortValue, entry); // invert for sort by score
         }
 
-        /** Partition by host / domain or IP. */
+        /** Partition by host / domain or IP.
+         *
+         * 根据 partition.url.mode 配置决定使用那种方式对 url 进行分区。假设以 host 方式分区，
+         * 那么同一 host 下的所有 url 都会被分到一个 partition 中。在抓取阶段，Fetcher 就可以
+         * 采取控制手段，调整对某个 host 的并发数，减小目标站点的压力。
+         */
         public int getPartition(FloatWritable key, Writable value,
                                 int numReduceTasks) {
             return partitioner.getPartition(((SelectorEntry) value).url, key,
@@ -334,6 +339,7 @@ public class Generator extends NutchTool implements Tool {
                     hostCount[1]++;
 
                     // check if topN reached, select next segment if it is
+                    // 检查某个段是否还有空间，无空间的话，挪到下一个段中存储。
                     while (segCounts[hostCount[0] - 1] >= limit
                             && hostCount[0] < maxNumSegments) {
                         hostCount[0]++;
