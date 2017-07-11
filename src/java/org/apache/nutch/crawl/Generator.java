@@ -78,6 +78,15 @@ public class Generator extends NutchTool implements Tool {
     public static final String GENERATOR_MAX_NUM_SEGMENTS = "generate.max.num.segments";
     public static final String GENERATOR_EXPR = "generate.expr";
 
+    /**
+     * SelectorEntry 存放了 url，CrawlDatum，以及 segnum。
+     * 这里为什么会使用这个结构体呢？
+     * Selector map 任务完成后，可以将 score 直接放入 CrawlDatum 对象的
+     * metadata 中，将 <url, datum> 作为输出，但是这样做就无法使用 score
+     * 进行排序了。如果使用 <score, datum> 作为输出，那么 url 就被丢掉了，
+     * 这显然是不合适的。所以这里需要一个结构体同时包含 url 和 datum，这样
+     * score 和 url 就可以被同时访问。
+     */
     public static class SelectorEntry implements Writable {
         public Text url;
         public CrawlDatum datum;
@@ -254,6 +263,7 @@ public class Generator extends NutchTool implements Tool {
             crawlDatum.getMetaData().put(Nutch.WRITABLE_GENERATE_TIME_KEY, genTime);
             entry.datum = crawlDatum;
             entry.url = key;
+            // 在由内存写入磁盘过程中，hadoop 对 key 进行排序，这里按照 score 降序的形式排序
             output.collect(sortValue, entry); // invert for sort by score
         }
 
@@ -476,6 +486,7 @@ public class Generator extends NutchTool implements Tool {
         long generateTime;
 
         public void configure(JobConf job) {
+            // GENERATE_TIME_KEY 在 Generator Job 运行时被设定为 Generator Job 启动时间
             generateTime = job.getLong(Nutch.GENERATE_TIME_KEY, 0L);
         }
 
@@ -732,6 +743,9 @@ public class Generator extends NutchTool implements Tool {
         job.setOutputFormat(SequenceFileOutputFormat.class);
         job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(CrawlDatum.class);
+        // 按照 url 的 hash 值进行排序，目的在于打散 url 在 segment 中的顺序，防止
+        // 同一 host/domain/ip 下的 url 过于集中在一起，导致其他 host/domain/ip
+        // 下的 url 长时间得不到下载
         job.setOutputKeyComparatorClass(HashComparator.class);
         JobClient.runJob(job);
         return segment;
