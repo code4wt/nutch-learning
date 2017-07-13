@@ -235,6 +235,7 @@ public class FetcherThread extends Thread {
                     if (feeder.isAlive() || ((FetchItemQueues) fetchQueues).getTotalSize() > 0) {
                         LOG.debug(getName() + " spin-waiting ...");
                         // spin-wait.
+                        // 记录有多少个下载线程进入了等待状态，spinWaiting 会作为下载任务的状态之一被输出到日志中
                         ((AtomicInteger) spinWaiting).incrementAndGet();
                         try {
                             Thread.sleep(500);
@@ -277,12 +278,14 @@ public class FetcherThread extends Thread {
                             LOG.debug("redirectCount=" + redirectCount);
                         }
                         redirecting = false;
+                        // 根据 url 的协议信息，返回相应的 Protocol 对象
                         Protocol protocol = this.protocolFactory.getProtocol(fit.url.toString());
                         BaseRobotRules rules = protocol.getRobotRules(fit.url, fit.datum, robotsTxtContent);
                         if (robotsTxtContent != null) {
                             outputRobotsTxt(robotsTxtContent);
                             robotsTxtContent.clear();
                         }
+                        // 检测 FetchItem 中的 url 是否符合 robots 协议，不符合则不允许采集
                         if (!rules.isAllowed(fit.u.toString())) {
                             // unblock
                             ((FetchItemQueues) fetchQueues).finishFetchItem(fit, true);
@@ -475,6 +478,7 @@ public class FetcherThread extends Thread {
             String origHost = new URL(urlString).getHost().toLowerCase();
             String newHost = new URL(newUrl).getHost().toLowerCase();
             if (ignoreExternalLinks) {
+                // 如果忽略外链跳转，且跳转地址的 host 不等于原始地址的 host，则认为该跳转地址为外链，不做跳转
                 if (!origHost.equals(newHost)) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug(" - ignoring redirect " + redirType + " from "
@@ -486,6 +490,7 @@ public class FetcherThread extends Thread {
             }
 
             if (ignoreInternalLinks) {
+                // 如果忽略同 host 下的 url 跳转，且跳转地址的 host 等于原始地址的 host，则不做跳转
                 if (origHost.equals(newHost)) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug(" - ignoring redirect " + redirType + " from "

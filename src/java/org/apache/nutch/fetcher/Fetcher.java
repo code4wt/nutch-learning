@@ -84,9 +84,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author Andrzej Bialecki
  *
  * Fetcher 基于生产者(QueueFeeder)消费者(FetcherThread-s)模型，使用 FetcherItemQueues 作为
- * 生产者和消费者链接的桥梁。生产者 QueueFeeder 读取 fetchlists 并生产相应的 FetcherItem，放入
+ * 生产者和消费者连接的桥梁。生产者 QueueFeeder 读取 fetchlists 并生产相应的 FetcherItem，放入
  * FetcherItemQueues 中，消费者从 FetcherItemQueues 中获取 FetcherItem，并进行抓取操作。抓取
- * 线程通过使用 protocol系列插件，可对不同协议的链接进行抓取。
+ * 线程通过使用 protocol 系列插件，可对不同协议的链接进行抓取。
  */
 public class Fetcher extends NutchTool implements Tool,
         MapRunnable<Text, CrawlDatum, Text, NutchWritable> {
