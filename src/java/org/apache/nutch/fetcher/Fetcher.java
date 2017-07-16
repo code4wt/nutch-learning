@@ -403,6 +403,8 @@ public class Fetcher extends NutchTool implements Tool,
 
             // check timelimit
             if (!feeder.isAlive()) {
+                // 如果设置了 timelimit，且 System.currentTimeMillis() > timelimit，
+                // 则清空所有 FetchQueue
                 int hitByTimeLimit = fetchQueues.checkTimelimit();
                 if (hitByTimeLimit != 0)
                     reporter.incrCounter("FetcherStatus", "hitByTimeLimit",

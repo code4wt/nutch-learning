@@ -581,6 +581,19 @@ public class FetcherThread extends Thread {
         return output(key, datum, content, pstatus, status, 0);
     }
 
+    /**
+     * output 方法主要做了两件事：
+     * 1. 解析 content，得到 ParseResult
+     * 2. 从 ParseResult 得到 ParseData，再从 ParseData 获取 outlinks。
+     *    最后对 outlinks 进行正规，过滤处理，并存储到 crawlDB 和 FetchItemQueue 中。
+     * @param key
+     * @param datum
+     * @param content
+     * @param pstatus
+     * @param status
+     * @param outlinkDepth
+     * @return
+     */
     private ParseStatus output(Text key, CrawlDatum datum, Content content,
                                ProtocolStatus pstatus, int status, int outlinkDepth) {
 
@@ -616,6 +629,7 @@ public class FetcherThread extends Thread {
                 if (!skipTruncated
                         || (skipTruncated && !ParseSegment.isTruncated(content))) {
                     try {
+                        // 对 content 进行解析
                         parseResult = this.parseUtil.parse(content);
                     } catch (Exception e) {
                         LOG.warn("Error parsing: " + key + ": "
